@@ -1,0 +1,18 @@
+# Default database configurations
+schemaName: ONTORELA
+rdbmsName:
+  - postgresql
+defaultKeyName: uid
+defaultKeyDomainName: uid_domain
+defaultKeyType: UUID
+defaultAttributeName : value
+defaultAttributeDomaineName: value_domain
+defaultAttributeType: TEXT
+maxIdentifierLength: 30
+useIriAsTableId : false
+normalizeDatatype: true
+generateOpTable: true
+removeThingTable: false
+languages:
+  - en
+  - fr

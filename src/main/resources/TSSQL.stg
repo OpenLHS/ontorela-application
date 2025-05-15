@@ -1,0 +1,177 @@
+import "SSQL.stg" 
+/*************************************************************
+Gabarit de génération de code SQL pour une base de données historiciée pour Postgres v9.6+
+Notes :
+  * Tous les identificateurs doivent avoir un delimiteur.
+**************************************************************/
+
+/*************************************************************
+Définition des contraintes temporelles.
+TODO : CREATE EXTENSION btree_gist;
+**************************************************************/
+noRedundancy(schemaId, tableId, keyAttSet, noKeyAttId, vtId) ::=
+<<
+-- No redundancy constraint for <tableId>
+ALTER TABLE <schemaId:delimiteur()>.<tableId:delimiteur()> 
+  ADD CONSTRAINT <tableId>_redundancy
+  EXCLUDE USING gist(<keyAttSet:{a|<a.id:delimiteur()> WITH =}; separator=", ">, <if(noKeyAttId)><noKeyAttId:delimiteur()> WITH =, <endif><vtId> WITH &&);
+<\n> 
+>>
+
+noCircumlocution(schemaId, tableId, keyAttSet, noKeyAttId, vtId) ::=
+<<
+-- No circumlocution constraint for <tableId>
+ALTER TABLE <schemaId:delimiteur()>.<tableId:delimiteur()> 
+  ADD CONSTRAINT <tableId>_circumlocution
+  EXCLUDE USING gist(<keyAttSet:{a|<a.id:delimiteur()> WITH =}; separator=", ">, <if(noKeyAttId)><noKeyAttId:delimiteur()> WITH =, <endif><vtId> WITH -|-);
+<\n> 
+>>
+
+noContradiction(schemaId, tableId, keyAttSet, noKeyAttId, vtId) ::=
+<<
+-- No contradiction constraint for <tableId>
+ALTER TABLE <schemaId:delimiteur()>.<tableId:delimiteur()> 
+  ADD CONSTRAINT <tableId>_contradiction
+  EXCLUDE USING gist(<keyAttSet:{a|<a.id:delimiteur()> WITH =}; separator=", ">, <if(noKeyAttId)><noKeyAttId:delimiteur()> WITH \<>, <endif><vtId> WITH &&);
+<\n> 
+>>
+
+/*************************************************************
+Définition des fonctions de contruction d'intervalle.
+**************************************************************/
+create_vxe_function(schemaId) ::=
+<<
+CREATE OR REPLACE FUNCTION <schemaId:delimiteur()>.vxe(endDate <schemaId:delimiteur()>."POINT")
+  RETURNS <schemaId:delimiteur()>."PERIOD"
+  AS 'SELECT daterange(null, endDate, ''[]'')::<schemaId:delimiteur()>."PERIOD";'
+  LANGUAGE SQL
+  IMMUTABLE
+  RETURNS NULL ON NULL INPUT;
+<\n> 
+>>
+
+create_vbx_function(schemaId) ::=
+<<
+CREATE OR REPLACE FUNCTION <schemaId:delimiteur()>.vbx(beginDate <schemaId:delimiteur()>."POINT")
+  RETURNS <schemaId:delimiteur()>."PERIOD"
+  AS 'SELECT daterange(beginDate, null)::<schemaId:delimiteur()>."PERIOD";'
+  LANGUAGE SQL
+  IMMUTABLE
+  RETURNS NULL ON NULL INPUT;
+<\n>
+>>
+
+/*************************************************************
+Définition requête temporalle par défauts
+**************************************************************/
+simple_query(schemaId, tableId, attSet, funcSig) ::=
+<<
+SELECT <attSet:{a|<a.id:delimiteur()><if(a.alias)> AS <a.alias:delimiteur()><endif>}; separator=",  \n  ">
+  <if(funcSig)>,  <funcSig:{f|<f.id> AS <f.alias>}; separator=",  \n  "><endif>
+FROM <schemaId:delimiteur()>.<tableId:delimiteur()>
+>>
+
+/*************************************************************
+Définition d'une vue historique
+**************************************************************/
+history_view(schemaId, viewId, vxeQuery, vbeQuery, vbxQuery)::=
+<<
+CREATE VIEW <schemaId:delimiteur()><if(schemaId)>.<endif><viewId:delimiteur()> AS
+  <vxeQuery>
+  UNION
+  <vbeQuery>
+  UNION
+  <vbxQuery>
+;
+<\n>
+>>
+
+history_view_def(schemaId, vueId, def) ::=
+<<
+COMMENT ON VIEW <schemaId:delimiteur()><if(schemaId)>.<endif><vueId:delimiteur()> IS '<def>';
+<\n>
+>>
+
+/*************************************************************
+Création de fonction de verification des axiomes normalisés
+**************************************************************/
+temporalUniqueness_check(schemaId, tableId, constraintId, vxeTableId, vbeTableId, vbxTableId, vxeAttId, vbeAttId, vbxAttId, keySet)::=
+<<
+-- Temporal uniqueness ckeck for : <tableId>
+CREATE OR REPLACE FUNCTION <schemaId:delimiteur()>.<constraintId:delimiteur()>()
+  RETURNS TABLE(<keySet:{a|<a.id:delimiteur()> <schemaId:delimiteur()>.<a.type:delimiteur()>}; separator=", ">, errorVt <schemaId:delimiteur()>."PERIOD") AS
+  $$
+  SELECT <keySet:{a|<a.id:delimiteur()>}; separator=", ">, <vbeAttId>
+  FROM <schemaId:delimiteur()>.<vbxTableId:delimiteur()> NATURAL JOIN <schemaId:delimiteur()>.<vbeTableId:delimiteur()>
+  WHERE <vbxAttId> \< upper(<vbeAttId>)
+  UNION
+  SELECT <keySet:{a|<a.id:delimiteur()>}; separator=", ">, <vbeAttId>
+  FROM <schemaId:delimiteur()>.<vbeTableId:delimiteur()> NATURAL JOIN <schemaId:delimiteur()>.<vxeTableId:delimiteur()>
+  WHERE <vxeAttId> > lower(<vbeAttId>)-1
+  UNION
+  SELECT <keySet:{a|<a.id:delimiteur()>}; separator=", ">, <schemaId:delimiteur()>.vbx(<vbxAttId>)
+  FROM <schemaId:delimiteur()>.<vxeTableId:delimiteur()> NATURAL JOIN <schemaId:delimiteur()>.<vbxTableId:delimiteur()>
+  WHERE <vxeAttId> > <vbxAttId>-1;
+  $$
+  LANGUAGE SQL;
+<\n>
+>>
+
+/*************************************************************
+Création de fonction d'insertion
+**************************************************************/
+dataAxiom_insertion(schemaId, tableId, keyAtt, typeTableId, typeKeyAttId, typeValAtt) ::=
+<<
+CREATE OR REPLACE FUNCTION <schemaId:delimiteur()>.<tableId:delimiteur()>(_<keyAtt.id> <schemaId:delimiteur()>.<keyAtt.type:delimiteur()>, _value <schemaId:delimiteur()>.<typeValAtt.type:delimiteur()>, _vt <schemaId:delimiteur()>."PERIOD")
+  RETURNS VOID AS
+  $$
+  DECLARE
+    _typeId INT;
+    err_msg TEXT;
+  BEGIN
+    RAISE NOTICE 'TO INSERT % % %', _ug_dbid, _value, _vt;
+    SELECT dbid INTO _typeId FROM hegp_sh.id WHERE value = _value;
+
+    IF _typeId IS NULL THEN
+      _typeId := nextval('hegp_sh.typeId');
+      RAISE NOTICE 'CREATED _typeId = %', _typeId;
+      INSERT INTO hegp_sh.id(dbid, value) VALUES(_typeId, _value);
+    END IF;
+
+    IF lower(_vt) IS NULL THEN
+      RAISE NOTICE 'INSERT ug_has_id_vxe';
+      INSERT INTO hegp_sh.ug_has_id_vxe(ug_dbid, id_dbid, until) VALUES(_ug_dbid, _typeId, upper(_vt));
+    ELSEIF upper(_vt) IS NULL THEN
+      RAISE NOTICE 'INSERT ug_has_id_vbx';
+      INSERT INTO hegp_sh.ug_has_id_vbx(ug_dbid, id_dbid, since) VALUES(_ug_dbid, _typeId, lower(_vt));
+    ELSE
+      RAISE NOTICE 'INSERT ug_has_id_vbe';
+      INSERT INTO hegp_sh.ug_has_id_vbe(ug_dbid, id_dbid, during) VALUES(_ug_dbid, _typeId, _vt);
+    END IF;
+
+  EXCEPTION WHEN OTHERS THEN
+    GET STACKED DIAGNOSTICS err_msg = MESSAGE_TEXT;
+    RAISE EXCEPTION 'ug_insert %', err_msg;
+  END;
+  $$
+  LANGUAGE 'plpgsql';
+<\n>
+>>
+
+classAxiom_insertion(schemaId, tableId, axiomString, supTableId) ::=
+<<
+CREATE OR REPLACE FUNCTION <schemaId:delimiteur()>.<tableId>_insert(...)
+  RETURNS BOOLEAN
+  $$
+  -- <axiomString>
+  -- TODO INSERT INTO <schemaId:delimiteur()>.<tableId:delimiteur()>
+  -- TODO INSERT INTO <schemaId:delimiteur()>.<supTableId:delimiteur()>
+  $$
+  LANGUAGE 'plpgsql';
+<\n>
+>>
+
+/**************************************************************
+ Divers gabarit réutilisable
+***************************************************************/
+attSet(set)::= <% (<set:{a|<a.id:delimiteur()> <a.type:delimiteur()>}; separator=", ">) %>

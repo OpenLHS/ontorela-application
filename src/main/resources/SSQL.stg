@@ -1,0 +1,546 @@
+/*************************************************************
+Gabarit de génération de code SQL pour Postgres v9.6+
+Notes :
+  * Tous les identificateurs doivent avoir un delimiteur.
+**************************************************************/
+
+enteteFichierSQL(schema_id, date_creation, responsable, version, objet)::=
+<<
+/*
+-- =========================================================================== A
+Schema : <schema_id>
+Creation Date : <date_creation>
+Encoding : UTF-8, sans BOM, fin de ligne Unix (LF)
+Plateforme : PostgreSQL 9.6
+Responsable : <responsable>
+Version : <version>
+Status : dev
+Objet :
+  <objet>
+-- =========================================================================== A
+*/
+<\n>
+>>
+
+enteteFichierDoc(schema_id, date_creation, responsable, version, objet)::=
+<<
+{-
+-- =========================================================================== A
+Schema : <schema_id>
+Creation Date : <date_creation>
+Responsable : <responsable>
+Version : <version>
+Status : dev
+Objet :
+  <objet>
+-- =========================================================================== A
+-}
+<\n>
+>>
+
+/*************************************************************
+Définition d'un schema
+**************************************************************/
+schema(schema_id)::=
+<<
+CREATE SCHEMA IF NOT EXISTS <schema_id:delimiteur()>;
+<\n>
+>>
+
+schema_def(schema_id, def) ::=
+<<
+COMMENT ON SCHEMA <schema_id:delimiteur()> IS '<def>';
+<\n>
+>>
+
+sup_schema(schema_id, enCascade)::=
+<<
+DROP SCHEMA <schema_id:delimiteur()> <if(enCascade)>CASCADE<endif>;
+<\n>
+>>
+/*************************************************************
+Définition d'un domaine (Type Prédéfini)
+**************************************************************/
+domaine(schema_id,type_id, domaine_id)::=
+<<
+-- <type_id> domain definition
+CREATE DOMAIN <schema_id:delimiteur()><if(schema_id)>.<endif><type_id:delimiteur()> AS <domaine_id>;
+<\n>
+>>
+
+suppression_domaine(schema_id, domaine_id)::=
+<<
+DROP DOMAIN <schema_id:delimiteur()><if(schema_id)>.<endif><domaine_id:delimiteur()> CASCADE;
+<\n>
+>>
+/*************************************************************
+Définition d'une table
+**************************************************************/
+relvar(schema_id, var_id, ensAtt, contrainte_id, attCle)::=
+<<
+-- table <var_id> definition
+CREATE TABLE <schema_id:delimiteur()><if(schema_id)>.<endif><var_id:delimiteur()>
+(
+  <ensAtt:{a|<a.id:delimiteur()> <schema_id:delimiteur()>.<a.type:delimiteur()>  NOT NULL}; separator=", \n"><if(contrainte_id)>,
+  <contrainte_clePrimaire(contrainte_id, attCle)>
+  <endif>
+);
+<\n>
+>>
+
+relvar_def(schema_id, var_id, def) ::=
+<<
+COMMENT ON TABLE <schema_id:delimiteur()><if(schema_id)>.<endif><var_id:delimiteur()> IS '<def>';
+<\n>
+>>
+
+attribut_def(schema_id, var_id, att_id, def) ::=
+<<
+COMMENT ON COLUMN <schema_id:delimiteur()><if(schema_id)>.<endif><var_id:delimiteur()>.<att_id:delimiteur()> IS '<def>';
+<\n>
+>>
+
+suppression_relvar(schema_id, var_id, enCascade)::=
+<<
+DROP TABLE <schema_id:delimiteur()><if(schema_id)>.<endif><var_id:delimiteur()> <if(enCascade)>CASCADE<endif>;
+<\n>
+>>
+
+/*************************************************************
+Définition d'une vue
+**************************************************************/
+vue_renommage(vue_schema, vue_id, var_schema, var_id, ensAtt)::=
+<<
+CREATE VIEW <vue_schema:delimiteur()><if(vue_schema)>.<endif><vue_id:delimiteur()> AS
+  SELECT <if(ensAtt)><ensAtt:{a|<a.id:delimiteur()> AS <a.alias:delimiteur()>}; separator=",  \n    "><else>*<endif>
+  FROM <var_schema:delimiteur()><if(var_schema)>.<endif><var_id:delimiteur()>;
+<\n>
+>>
+
+/****** TEST NE PAS UTILISER *******/
+view_ontoClass_test(schema_id, vue_id, class_iri, table_id, ensAtt, ensTable)::=
+<<
+-- Vue de la classe <class_iri>
+CREATE VIEW <schema_id:delimiteur()><if(schema_id)>.<endif><vue_id:delimiteur()> AS
+  SELECT <if(ensAtt)><ensAtt:{a|<a.id:delimiteur()>}; separator=",  \n    "><else>*<endif>
+  FROM <schema_id:delimiteur()>.<table_id:delimiteur()> 
+    JOIN <ensTable:{t|<schema_id:delimiteur()>.<t.id:delimiteur()> ON(<t.sourceKey:delimiteur()> = <t.targetKey:delimiteur()>)}; separator="\n    JOIN ">
+;
+<\n>
+>>
+
+view_ontoClass(view_schema, view_id, class_iri, var_schema, var_id, ensAtt, ensTable)::=
+<<
+-- Vue de la classe <class_iri>
+CREATE VIEW <view_schema:delimiteur()><if(view_schema)>.<endif><view_id:delimiteur()> AS
+  SELECT <if(ensAtt)><ensAtt:{a|<a.id:delimiteur()>}; separator=",  \n    "><else>*<endif>
+  FROM <var_schema:delimiteur()>.<var_id:delimiteur()> 
+    JOIN <ensTable:{t|<var_schema:delimiteur()>.<t.id:delimiteur()> USING(<t.var_key:delimiteur()>) -- <t.axiomString>}; separator="\n    JOIN ">
+;
+<\n>
+>>
+
+vue_def(schema_id, vue_id, def) ::=
+<<
+COMMENT ON VIEW <schema_id:delimiteur()><if(schema_id)>.<endif><vue_id:delimiteur()> IS '<def>';
+<\n>
+>>
+
+vue_table_def_ontorelcat(code)::=
+<<
+-- Vue ontorelcat_pub
+create or replace view "ontorelcat_pub"."Table_Definition" as
+select distinct "ontorel_id",
+                "table_id",
+                coalesce("Label"."value", "iri") AS "label",
+                'Class'                          AS "type"
+from "ontorelcat_pub"."Onto_Class"
+         left join "ontorelcat_pub"."Label" using ("ontorel_id", "iri")
+where code = '<code>'
+union all
+select distinct "ontorel_id",
+                "table_id",
+                coalesce("domain", "domain_iri") || ' ' || coalesce("property", "property_iri") || ' ' ||
+                "domain_card" || ' ' || coalesce("range", "range_iri"),
+                'ObjectProperty'
+FROM "ontorelcat_pub"."Onto_Class_Axiom"
+         left join "ontorelcat_pub"."Label" "Domain_Label"("ontorel_id", "domain_iri", "code", "domain")
+                   using ("ontorel_id", "domain_iri")
+         left join "ontorelcat_pub"."Label" "Range_Label"("ontorel_id", "range_iri", "code", "range")
+                   using ("ontorel_id", "range_iri", "code")
+         left join "ontorelcat_pub"."Label" "Property_Label"("ontorel_id", "property_iri", "code", "property")
+                   using ("ontorel_id", "property_iri", "code")
+where code = '<code>'
+union all
+select distinct "ontorel_id",
+                "table_id",
+                coalesce("domain", "domain_iri") || ' ' || coalesce("property", "property_iri") || ' ' ||
+                "domain_card" || ' ' || coalesce("range", "range_iri"),
+                'DataProperty'
+FROM "ontorelcat_pub"."Onto_Data_Axiom"
+         left join "ontorelcat_pub"."Label" "Domain_Label"("ontorel_id", "domain_iri", "code", "domain")
+                   using ("ontorel_id", "domain_iri")
+         left join "ontorelcat_pub"."Label" "Range_Label"("ontorel_id", "range_iri", "code", "range")
+                   using ("ontorel_id", "range_iri", "code")
+         left join "ontorelcat_pub"."Label" "Property_Label"("ontorel_id", "property_iri", "code", "property")
+                   using ("ontorel_id", "property_iri", "code")
+where code = '<code>'
+union all
+select distinct "ontorel_id",
+                "table_id",
+                coalesce("Label"."value", "iri") AS "label",
+                'DataType'                       AS "type"
+from "ontorelcat_pub"."Onto_Data_Type"
+         left join "ontorelcat_pub"."Label" using ("ontorel_id", "iri")
+where table_id is not null
+  and code = '<code>';
+<\n>
+>>
+
+
+/*************************************************************
+Création d'une contrainte
+**************************************************************/
+contrainte_clePrimaire(contrainte_id, attCle)::=
+<<
+CONSTRAINT <contrainte_id:delimiteur()> PRIMARY KEY (<attCle:{a|<a.id:delimiteur()>}; separator=", ">)
+>>
+
+contrainte_cleSecondaire(schema_id, var_id, contrainte_id, attCle)
+::= <<
+-- Key definition for <var_id>
+ALTER TABLE <schema_id:delimiteur()><if(schema_id)>.<endif><var_id:delimiteur()>
+  ADD CONSTRAINT <contrainte_id:delimiteur()> UNIQUE (<attCle:{a|<a.id:delimiteur()>}; separator=", ">);
+<\n>
+>>
+
+contrainte_referentielle(varOrigine_schema, varOrigine_id, contrainte_id, ensAttOrigine,
+                         varDestination_schema, varDestination_id, ensAttDestination)::=
+<<
+-- Foreign key definition : <varOrigine_id> -> <varDestination_id>
+ALTER TABLE <varOrigine_schema:delimiteur()><if(varOrigine_schema)>.<endif><varOrigine_id:delimiteur()>
+  ADD CONSTRAINT <contrainte_id:delimiteur()> FOREIGN KEY (<ensAttOrigine:{a|<a.id:delimiteur()>}; separator=", ">)
+    REFERENCES <varDestination_schema:delimiteur()><if(varDestination_schema)>.<endif><varDestination_id:delimiteur()> (<ensAttDestination:{a|<a.id:delimiteur()>}; separator=", ">);
+<\n>
+>>
+
+contrainte_unique(varOrigine_schema,varOrigine_table,contrainte_id,ensAttOrigine)::=
+<<
+-- Unique key definition : <varOrigine_table>
+ALTER TABLE <varOrigine_schema:delimiteur()><if(varOrigine_schema)>.<endif><varOrigine_table:delimiteur()>
+  ADD CONSTRAINT <contrainte_id:delimiteur()> UNIQUE (<ensAttOrigine:{a|<a.id:delimiteur()>}; separator=", ">);
+<\n>
+>>
+
+cleRef_def(schema_id, contrainte_id, var_id, def) ::=
+<<
+COMMENT ON CONSTRAINT <contrainte_id:delimiteur()> ON <schema_id:delimiteur()><if(schema_id)>.<endif><var_id:delimiteur()> IS '<def>';
+<\n>
+>>
+
+/**************************************************************
+Manipulation d'un schéma
+***************************************************************/
+insertion(schema_id, var_id, ensAtt, ensValeur)::=
+<<
+INSERT INTO <schema_id:delimiteur()><if(schema_id)>.<endif><var_id:delimiteur()> (<ensAtt(ensAtt)>)
+  VALUES (<ensValeur:{v|<a.valeur>}; separator=", \n">);
+<\n>
+>>
+
+suppression_donnees(schema_id, var_id, alias)::=
+<<
+DELETE FROM <schema_id:delimiteur()><if(schema_id)>.<endif><var_id:delimiteur()> <if(alias)>AS <alias><endif>;
+<\n>
+>>
+/*************************************************************
+Création de requête
+**************************************************************/
+requete(distinct, quantificateur, projection, selection, condition)::=
+<<
+SELECT <if(distinct)>DISTINCT<endif><projection:{a|<a.exp>}; separator=", ">
+FROM <selection:{a|<a.exp>}; separator=", ">
+;
+<\n>
+>>
+/*************************************************************
+Création de fonction de verification participation Min
+**************************************************************/
+verificationParticipationMin(contrainte_id, schema_id, table_id, domaine_cle, min)::=
+<<
+-- Minimum participation ckeck on : <table_id>
+CREATE OR REPLACE FUNCTION <schema_id:delimiteur()>.<contrainte_id:delimiteur()>(<delimiteur(["_",domaine_cle.id])> <schema_id:delimiteur()>.<domaine_cle.type:delimiteur()>)
+  RETURNS BOOLEAN AS
+$$
+BEGIN
+  IF
+  (
+    (
+      SELECT COUNT(*)
+      FROM <schema_id:delimiteur()>.<table_id:delimiteur()>
+      WHERE <domaine_cle.id:delimiteur()> = <delimiteur(["_",domaine_cle.id])>
+    ) >= <min>
+  )
+  THEN
+    RETURN TRUE;
+  ELSE
+    RAISE NOTICE 'Participation  %  does not respect minimum value %', '<table_id>', <min>;
+    RETURN FALSE;
+  END IF;
+END;
+$$
+LANGUAGE 'plpgsql';
+<\n>
+>>
+/*************************************************************
+Création de fonction de verification participation Max
+**************************************************************/
+verificationParticipationMax(contrainte_id, schema_id, table_id, domaine_cle, max)::=
+<<
+-- Maximum participqtion ckeck on : <table_id>
+CREATE OR REPLACE FUNCTION <schema_id:delimiteur()>.<contrainte_id:delimiteur()>(<delimiteur(["_",domaine_cle.id])> <schema_id:delimiteur()>.<domaine_cle.type:delimiteur()>)
+  RETURNS BOOLEAN AS
+$$
+BEGIN
+  IF
+  (
+    (
+      SELECT COUNT(*)
+      FROM <schema_id:delimiteur()>.<table_id:delimiteur()>
+      WHERE <domaine_cle.id:delimiteur()> = <delimiteur(["_",domaine_cle.id])>
+    ) \<= <max>
+  )
+  THEN
+    RETURN TRUE;
+  ELSE
+    RAISE NOTICE 'Participation  %  does not respect maximal value %', '<table_id>', <max>;
+    RETURN FALSE;
+  END IF;
+END;
+$$
+LANGUAGE 'plpgsql';
+<\n>
+>>
+
+/*************************************************************
+Création de fonction de verification d'appartenance d'un tuple à une classe
+**************************************************************/
+checkMembership(contrainte_id, schema_id, sourceTable_id, sourceAtt, targetTableMap)::=
+<<
+-- Membership ckeck on : <sourceTable_id>
+CREATE OR REPLACE FUNCTION <schema_id:delimiteur()>.<contrainte_id:delimiteur()>()
+  RETURNS <schema_id:delimiteur()>.<sourceTable_id:delimiteur()> AS
+$$
+SELECT *
+FROM <schema_id:delimiteur()>.<sourceTable_id:delimiteur()>
+WHERE <targetTableMap:{a| NOT EXISTS (SELECT <a.targetAtt:delimiteur()> FROM <schema_id:delimiteur()>.<a.table_id:delimiteur()> WHERE <sourceAtt:delimiteur()> = <a.targetAtt:delimiteur()>)}; separator="\n  AND ">
+;
+$$
+LANGUAGE SQL;
+<\n>
+>>
+
+/*************************************************************
+Création de fonction de verification des axiomes normalisés
+**************************************************************/
+checkUnionAxiom(contrainte_id, schema_id, unionTable_id, unionTable_keySet, elementSet)::=
+<<
+-- Union axiom ckeck on : <unionTable_id>
+CREATE OR REPLACE FUNCTION <schema_id:delimiteur()>.<contrainte_id:delimiteur()>()
+  RETURNS BOOLEAN AS
+$$
+DECLARE
+  union_string TEXT;
+BEGIN
+  IF NOT EXISTS
+  (
+    WITH t AS
+      (
+        SELECT <unionTable_keySet:{a|<a.id:delimiteur()>}; separator=", ">
+        FROM <schema_id:delimiteur()>.<unionTable_id:delimiteur()>
+        EXCEPT
+        <elementSet:{e|<e.exp>}; separator="\nUNION \n">
+      )
+    SELECT COUNT(*) FROM t
+  )
+  THEN
+    RETURN TRUE;
+  ELSE
+    RAISE NOTICE ' Union inclusion not respected for %', '<unionTable_id>';
+    RETURN FALSE;
+  END IF;
+END;
+$$
+LANGUAGE 'plpgsql';
+<\n>
+>>
+/**************************************************************
+Création des appels des procédures stockées (call *procedure/function*)
+pour alimenter les tables du schéma relationnel ontorelcat_pub
+***************************************************************/
+//Appel du procédure stockée ontorel_ins
+ontorel_ins (ontorel_id, version, import_date)::=
+<< call "ontorelcat_pub".ontorel_ins ('<ontorel_id>','<version>','<import_date>');
+<\n>
+>>
+
+//Appel du procédure stockée label_ins
+onto_label_ins (ontorel_id, iri, code, value)::=
+<< call "ontorelcat_pub".onto_label_ins ('<ontorel_id>','<iri>','<code>','<value>');
+<\n>
+>>
+
+//Appel du procédure stockée definition_ins
+onto_definition_ins (ontorel_id, iri, code, value)::=
+<< call "ontorelcat_pub".onto_definition_ins ('<ontorel_id>','<iri>','<code>','<value>');
+<\n>
+>>
+
+//Appel du procédure stockée onto_config_db_ins
+onto_config_db_ins (ontorel_id, DefaultKeyNameOntorelcat,
+                               DefaultKeyDomainNameOntorelcat,
+                               DefaultKeyTypeOntorelcat,
+                               DefaultAttributeNameOntorelcat,
+                               DefaultAttributeDomaineNameOntorelcat,
+                               DefaultAttributeType,
+                               MaxIdentifierLengthOntorelcat,
+                               UseIriAsTableIdOntorelcat,
+                               NormalizeDatatypeOntorelcat,
+                               RemoveThingTable,
+                               GenerateOpTable)::=
+<< call "ontorelcat_pub".onto_config_db_ins ('<ontorel_id>',
+                            '<DefaultKeyNameOntorelcat>',
+                            '<DefaultKeyDomainNameOntorelcat>',
+                            '<DefaultKeyTypeOntorelcat>',
+                            '<DefaultAttributeNameOntorelcat>',
+                            '<DefaultAttributeDomaineNameOntorelcat>',
+                            '<DefaultAttributeType>',
+                            '<MaxIdentifierLengthOntorelcat>',
+                            '<UseIriAsTableIdOntorelcat>',
+                            '<NormalizeDatatypeOntorelcat>',
+                            '<RemoveThingTable>',
+                            '<GenerateOpTable>');
+<\n>
+>>
+
+//Appel du procédure stockée onto_schema_ins
+onto_schema_ins (ontorel_id, schema_name, code, value)::=
+<< call "ontorelcat_pub".onto_schema_ins ('<ontorel_id>','<schema_name>','<code>','<value>');
+<\n>
+>>
+
+//Appel du procédure stockée onto_import_ins
+onto_import_ins (ontorel_id, file_name, json, create_date)::=
+<< call "ontorelcat_pub".onto_import_ins ('<ontorel_id>','<file_name>','<json>','<create_date>');
+<\n>
+>>
+
+//Appel du procédure stockée ontology_ins
+ontology_ins (ontorel_id, iri, file_name, alias, version, create_date)::=
+<< call "ontorelcat_pub".ontology_ins ('<ontorel_id>','<iri>','<file_name>','<alias>','<version>','<create_date>');
+<\n>
+>>
+
+//Appel du procédure stockée ontology_label_ins
+ontology_label_ins (ontorel_id, iri, code, value)::=
+<< call "ontorelcat_pub".ontology_label_ins ('<ontorel_id>','<iri>','<code>','<value>');
+<\n>
+>>
+
+//Appel du procédure stockée onto_class_ins
+onto_class_ins (ontorel_id, iri, table_id, origin_class)::=
+<< call "ontorelcat_pub".onto_class_ins ('<ontorel_id>','<iri>','<table_id>','<origin_class>');
+<\n>
+>>
+
+//Appel du procédure stockée onto_data_type_ins
+onto_data_type_ins (ontorel_id, iri, table_id, owlsql_type)::=
+<< call "ontorelcat_pub".onto_data_type_ins ('<ontorel_id>','<iri>','<table_id>','<owlsql_type>');
+<\n>
+>>
+
+//Appel du procédure stockée onto_data_type_sql_ins
+onto_data_type_sql_ins (ontorel_id, iri, owlsql_type, postgresql_type)::=
+<< call "ontorelcat_pub".onto_data_type_sql_ins ('<ontorel_id>',<if(iri)>'<iri>'<else>null<endif>,'<owlsql_type>','<postgresql_type>');
+<\n>
+>>
+
+//Appel du procédure stockée onto_class_inheritance_ins
+onto_class_inheritance_ins (ontorel_id, superclass_iri, subclass_iri)::=
+<< call "ontorelcat_pub".onto_class_inheritance_ins ('<ontorel_id>','<superclass_iri>','<subclass_iri>');
+<\n>
+>>
+
+//Appel du procédure stockée onto_object_properties_ins
+onto_object_properties_ins (ontorel_id, iri, table_id)::=
+<< call "ontorelcat_pub".onto_object_properties_ins ('<ontorel_id>','<iri>', <if(table_id)>'<table_id>'<else>null<endif>);
+<\n>
+>>
+
+//Appel du procédure stockée onto_object_properties_domain_ins
+onto_object_properties_domain_ins (ontorel_id, class_iri, property_iri)::=
+<< call "ontorelcat_pub".onto_object_properties_domain_ins ('<ontorel_id>','<class_iri>','<property_iri>');
+<\n>
+>>
+
+//Appel du procédure stockée onto_object_properties_range_ins
+onto_object_properties_range_ins (ontorel_id, class_iri, property_iri)::=
+<< call "ontorelcat_pub".onto_object_properties_range_ins ('<ontorel_id>','<class_iri>','<property_iri>');
+<\n>
+>>
+
+//Appel du procédure stockée onto_object_property_inheritance_ins
+onto_object_property_inheritance_ins (ontorel_id, superproperty_iri, subproperty_iri)::=
+<< call "ontorelcat_pub".onto_object_property_inheritance_ins ('<ontorel_id>','<superproperty_iri>','<subproperty_iri>');
+<\n>
+>>
+
+//Appel du procédure stockée onto_data_properties_ins
+onto_data_properties_ins (ontorel_id, iri)::=
+<< call "ontorelcat_pub".onto_data_properties_ins ('<ontorel_id>','<iri>');
+<\n>
+>>
+
+//Appel du procédure stockée onto_data_properties_domain_ins
+onto_data_properties_domain_ins (ontorel_id, class_iri, property_iri)::=
+<< call "ontorelcat_pub".onto_data_properties_domain_ins ('<ontorel_id>','<class_iri>','<property_iri>');
+<\n>
+>>
+
+//Appel du procédure stockée onto_data_properties_range_ins
+onto_data_properties_range_ins (ontorel_id, datatype_iri, property_iri, sql_type)::=
+<< call "ontorelcat_pub".onto_data_properties_range_ins ('<ontorel_id>','<datatype_iri>','<property_iri>', '<sql_type>');
+<\n>
+>>
+
+//Appel du procédure stockée onto_class_axiom_ins
+onto_class_axiom_ins (ontorel_id, domain_iri, range_iri, property_iri, domain_card, range_card, origin, table_id)::=
+<< call "ontorelcat_pub".onto_class_axiom_ins ('<ontorel_id>','<domain_iri>','<range_iri>','<property_iri>','<domain_card>','<range_card>','<origin>','<table_id>');
+<\n>
+>>
+
+//Appel du procédure stockée onto_data_axiom_ins
+onto_data_axiom_ins (ontorel_id, domain_iri, range_iri, property_iri, domain_card, origin, table_id)::=
+<< call "ontorelcat_pub".onto_data_axiom_ins ('<ontorel_id>','<domain_iri>','<range_iri>','<property_iri>','<domain_card>','<origin>','<table_id>');
+<\n>
+>>
+
+/**************************************************************
+ Divers gabarit réutilisable
+***************************************************************/
+bijointure(varGauche, varDroite, attJointure) ::=
+<% <relvars:{v|<v.schema_id:delimiteur()><if(v.schema_id)>.<endif><v.var_id:delimiteur()>};
+   separator=" JOIN ">
+%>
+
+ensAtt(att)::= <% (<att:{a|<a.id:delimiteur()>}; separator=", ">) %>
+
+paramAtt(att)::= <% (<att:{a|<a.entier>}; separator=", ">) %>
+
+delimiteur(id) ::= <% "<id>"%>
+
+selectKeys(schema_id, table_id, keySet) ::=
+<%
+  SELECT <keySet:{a|<a.id:delimiteur()>}; separator=", "> <\n>
+  FROM <schema_id:delimiteur()>.<table_id:delimiteur()>
+%>

@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+<!-- ************************* Définition des propriétés *************************  -->
+  <statusListener class="ch.qos.logback.core.status.NopStatusListener" />
+    <!--  <include ressource="libs/Monto/logback.xml"/>  -->
+  
+  <property name="DEGUB_DIR" value="./log}" />
+  <property name="DEBUG_LOG_PATTERN"
+    value="[%thread] %-5level [%file:%line] : %msg %n" />
+  <timestamp key="fileDataPattern" datePattern="yyyy-MM-dd_HHmm"/>
+  
+  <property name="DIAG_DIR"  value="./diagnotics}" />
+  <property name="DIAG_LOG_PATTERN"
+    value="%msg %n" />
+  <timestamp key="fileDataPattern" datePattern="yyyy-MM-dd_HHmm"/>
+
+  <!-- L'appender definia la ressource de sortie des logs ici c'est la console -->
+  <appender name="console" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <charset>UTF-8</charset>
+      <pattern>%-5level [%file:%line] : %msg%n</pattern>
+    </encoder>
+    <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+      <level>OFF</level>
+    </filter>
+  </appender> 
+  <!-- =============================================== DEBUT définition des loggeurs -->
+  <!-- =============================================== OntoRelA Logger -->
+  <appender name="owlSqlDatatypes_debug_log" class="ch.qos.logback.core.FileAppender">
+      <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>WARN</level>
+      </filter>
+      <file>${DEGUB_DIR}/${fileDataPattern}/OwlSqlDatatypes_debug.${fileDataPattern}.log</file>
+      <encoder>
+          <charset>UTF-8</charset>
+          <pattern>${DEBUG_LOG_PATTERN}</pattern>
+      </encoder>
+  </appender>
+  <logger name="ca.griis.ontorela.configuration.OwlSqlDatatypes"  level="WARN">
+    <appender-ref ref="owlSqlDatatypes_debug_log"/>
+  </logger>
+  
+  <appender name="ontoRel_debug_log" class="ch.qos.logback.core.FileAppender">
+      <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>DEBUG</level>
+      </filter>
+      <file>${DEGUB_DIR}/${fileDataPattern}/OntoRel_debug.${fileDataPattern}.log</file>
+      <encoder>
+          <charset>UTF-8</charset>
+          <pattern>${DEBUG_LOG_PATTERN}</pattern>
+      </encoder>
+  </appender>
+  <logger name="ca.griis.ontorela.converter.OntoRel"  level="DEBUG">
+    <appender-ref ref="ontoRel_debug_log"/>
+  </logger>
+  
+  <!-- =============================================== MOnto Logger -->  
+  <appender name="axiomNormalizer_debug_log" class="ch.qos.logback.core.FileAppender">
+      <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>DEBUG</level>
+      </filter>
+      <file>
+          ${DEGUB_DIR}/${fileDataPattern}/OwlApiAxiomNormalizer_debug.${fileDataPattern}.log
+      </file>
+      <encoder>
+          <charset>UTF-8</charset>
+          <pattern>${DEBUG_LOG_PATTERN}</pattern>
+      </encoder>
+  </appender>
+  <logger name="ca.griis.monto.facade.owlapi.OwlApiAxiomNormalizer"  level="DEBUG">
+    <appender-ref ref="axiomNormalizer_debug_log"/>
+  </logger>
+  
+    
+  <appender name="ontoGraph_debug_log" class="ch.qos.logback.core.FileAppender">
+      <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>DEBUG</level>
+      </filter>
+      <file>${DEGUB_DIR}/${fileDataPattern}/OntoGraph_debug.${fileDataPattern}.log</file>
+      <encoder>
+          <charset>UTF-8</charset>
+          <pattern>${DEBUG_LOG_PATTERN}</pattern>
+      </encoder>
+  </appender>
+  <logger name="ca.griis.monto.model.OntoGraph"  level="DEBUG">
+    <appender-ref ref="ontoGraph_debug_log"/>
+  </logger>
+
+  <appender name="ontoFilter_debug_log" class="ch.qos.logback.core.FileAppender">
+      <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>DEBUG</level>
+      </filter>
+      <file>${DEGUB_DIR}/${fileDataPattern}/MontoFilter.${fileDataPattern}.txt</file>
+      <encoder>
+          <charset>UTF-8</charset>
+          <pattern>${DEBUG_LOG_PATTERN}</pattern>
+      </encoder>
+  </appender>
+  <logger name="ca.griis.monto.builder.MontoFilter"  level="DEBUG">
+    <appender-ref ref="ontoFilter_debug_log"/>
+  </logger>
+  
+</configuration>
+<!-- ******************************************** -->
+<!-- Nom du fichier: logback-test.xml -->
+<!-- Description: Fichier de configuration utilise par Logback pour les tests. 
+  C'est le premier fichier de configuration qui sera chargé par logback -->
+<!-- ******************************************** -->
+
+<!-- Source :
+http://logback.qos.ch/manual/configuration.html 
+http://logback.qos.ch/manual/appenders.html
+http://logback.qos.ch/manual/layouts.html
+-->
+<!-- NIVEAUX DE MESSAGES - sensible à la case
+Description des différents niveaux de messages en ordre décroissant:
+
+OFF: Aucun message ne sera produit.
+TRACE: Utilisé pour consigner des informations utilisés en phase de 
+  développement ou de recette.
+  
+DEBUG: Utilisé pour consigner des informations qui seront exploités 
+  ensuite en production (audit, recherche des causes d'un dysfonctionnement.
+
+INFO: Utilisé pour consigner des informations sur le bon fonctionnement 
+  de l'application, avec un niveau de détail peu élevé,suivi de l'exécution 
+  d'un point de vue global.
+
+WARN: Utilisé pour consigner des alertes en cas d'instabilité du système 
+  qui ne provoque pas dysfonctionnement majeure sur l'application (utilisation 
+  d'API obsolètes, ressource non critique absente, etc.).
+
+ERROR: Utilisé pour consigner des alertes en cas d'erreur
+  critique du système qui provoque un dysfonctionnement majeur de l'application 
+  (blocage voire arrêt du système avec incidence sur l'exploitation).
+-->
+<!-- Exemple de pattern
+%d{HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n
+%date %level %logger{10} [%file:%line] %msg%n
+[%thread] %-5level [%file:%line] : %msg %n
+-->
