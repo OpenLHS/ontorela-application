@@ -1,0 +1,252 @@
+/*************************************************************
+Gabarit de génération de code SQL pour MSSQL 13.0+
+Notes :
+  * Tous les identificateurs doivent avoir un delimiteur.
+**************************************************************/
+
+enteteFichierSQL(schema_id, date_creation, responsable, version, objet)::=
+<<
+/*
+-- =========================================================================== A
+Schema : <schema_id>
+Creation Date : <date_creation>
+Encoding : UTF-8, sans BOM, fin de ligne Unix (LF)
+Plateforme : MSSQL 13.0+
+Responsable : <responsable>
+Version : <version>
+Status : dev
+Objet :
+  <objet>
+-- =========================================================================== A
+*/
+<\n>
+>>
+
+enteteFichierDoc(schema_id, date_creation, responsable, version, objet)::=
+<<
+{-
+-- =========================================================================== A
+Schema : <schema_id>
+Creation Date : <date_creation>
+Responsable : <responsable>
+Version : <version>
+Status : dev
+Objet :
+  <objet>
+-- =========================================================================== A
+-}
+<\n>
+>>
+
+/*************************************************************
+Définition d'un schema
+**************************************************************/
+schema(schema_id)::=
+<<
+CREATE SCHEMA <schema_id:delimiteur()>;
+GO<\n>
+>>
+
+schema_def(schema_id, def) ::=
+<<
+-- COMMENT ON SCHEMA <schema_id:delimiteur()> IS '<def>';
+GO<\n>
+>>
+
+sup_schema(schema_id, enCascade)::=
+<<
+DROP SCHEMA <schema_id:delimiteur()>;
+GO<\n>
+>>
+/*************************************************************
+Définition d'un domaine (Type Prédéfini)
+Pour définir les types qui peuvent être représentés par les domaines de base.
+**************************************************************/
+domaine(schema_id,type_id, domaine_id)::=
+<<
+-- <type_id> domain definition
+CREATE TYPE <schema_id:delimiteur()><if(schema_id)>.<endif><type_id:delimiteur()> FROM <domaine_id>;
+GO<\n>
+>>
+
+suppression_domaine(schema_id, domaine_id)::=
+<<
+DROP TYPE <schema_id:delimiteur()><if(schema_id)>.<endif><domaine_id:delimiteur()>;
+GO<\n>
+>>
+/*************************************************************
+Définition d'une table
+**************************************************************/
+relvar(schema_id, var_id, ensAtt, contrainte_id, attCle)::=
+<<
+-- table <var_id> definition
+CREATE TABLE <schema_id:delimiteur()><if(schema_id)>.<endif><var_id:delimiteur()>
+(
+  <ensAtt:{a|<a.id:delimiteur()> <schema_id:delimiteur()>.<a.type:delimiteur()>  NOT NULL}; separator=", \n"><if(contrainte_id)>,
+  <contrainte_clePrimaire(contrainte_id, attCle)>
+  <endif>
+);
+GO<\n>
+>>
+
+relvar_def(schema_id, var_id, def) ::=
+<<
+-- COMMENT ON TABLE <schema_id:delimiteur()><if(schema_id)>.<endif><var_id:delimiteur()> IS '<def>';
+<\n>
+>>
+
+attribut_def(schema_id, var_id, att_id, def) ::=
+<<
+-- COMMENT ON COLUMN <schema_id:delimiteur()><if(schema_id)>.<endif><var_id:delimiteur()>.<att_id:delimiteur()> IS '<def>';
+<\n>
+>>
+
+suppression_relvar(schema_id, var_id, enCascade)::=
+<<
+DROP TABLE <schema_id:delimiteur()><if(schema_id)>.<endif><var_id:delimiteur()>;
+GO<\n>
+>>
+
+/*************************************************************
+Définition d'une vue
+**************************************************************/
+vue_renommage(vue_schema, vue_id, var_schema, var_id, ensAtt)::=
+<<
+CREATE VIEW <vue_schema:delimiteur()><if(vue_schema)>.<endif><vue_id:delimiteur()> AS
+  SELECT <if(ensAtt)><ensAtt:{a|<a.id:delimiteur()> AS <a.alias:delimiteur()>}; separator=",  \n    "><else>*<endif>
+  FROM <var_schema:delimiteur()><if(var_schema)>.<endif><var_id:delimiteur()>;
+GO<\n>
+>>
+
+view_ontoClass(view_schema, view_id, class_iri, var_schema, var_id, ensAtt, ensTable)::=
+<<
+-- Vue de la classe <class_iri>
+CREATE VIEW <view_schema:delimiteur()><if(view_schema)>.<endif><view_id:delimiteur()> AS
+  SELECT <if(ensAtt)><ensAtt:{a|<a.id:delimiteur()>}; separator=",  \n    "><else>*<endif>
+  FROM <var_schema:delimiteur()>.<var_id:delimiteur()> 
+    JOIN <ensTable:{t|<var_schema:delimiteur()>.<t.id:delimiteur()> USING(<t.var_key:delimiteur()>) -- <t.axiomString>}; separator="\n    JOIN ">
+;
+GO<\n>
+>>
+
+vue_def(schema_id, vue_id, def) ::=
+<<
+-- COMMENT ON VIEW <schema_id:delimiteur()><if(schema_id)>.<endif><vue_id:delimiteur()> IS '<def>';
+<\n>
+>>
+
+/*************************************************************
+Création d'une contrainte
+**************************************************************/
+contrainte_clePrimaire(contrainte_id, attCle)::=
+<<
+CONSTRAINT <contrainte_id> PRIMARY KEY (<attCle:{a|<a.id:delimiteur()>}; separator=", ">)
+>>
+
+contrainte_referentielle(varOrigine_schema, varOrigine_id, contrainte_id, ensAttOrigine,
+                         varDestination_schema, varDestination_id, ensAttDestination)::=
+<<
+-- Foreign key definition : <varOrigine_id> -> <varDestination_id>
+ALTER TABLE <varOrigine_schema:delimiteur()><if(varOrigine_schema)>.<endif><varOrigine_id:delimiteur()>
+  ADD CONSTRAINT <contrainte_id> FOREIGN KEY (<ensAttOrigine:{a|<a.id:delimiteur()>}; separator=", ">)
+    REFERENCES <varDestination_schema:delimiteur()><if(varDestination_schema)>.<endif><varDestination_id:delimiteur()> (<ensAttDestination:{a|<a.id:delimiteur()>}; separator=", ">);
+GO<\n>
+>>
+
+cleRef_def(schema_id, contrainte_id, var_id, def) ::=
+<<
+-- COMMENT ON CONSTRAINT <contrainte_id> ON <schema_id:delimiteur()><if(schema_id)>.<endif><var_id:delimiteur()> IS '<def>';
+<\n>
+>>
+
+/**************************************************************
+Manipulation d'un schéma
+***************************************************************/
+suppression_donnees(schema_id, var_id, alias)::=
+<<
+DELETE FROM <schema_id:delimiteur()><if(schema_id)>.<endif><var_id:delimiteur()> <if(alias)>AS <alias><endif>;
+GO<\n>
+>>
+
+/*************************************************************
+Création de fonction de verification participation Min
+**************************************************************/
+verificationParticipationMin(contrainte_id, schema_id, table_id, domaine_cle, min)::=
+<<
+-- Minimum participation ckeck on : <table_id>
+CREATE OR ALTER FUNCTION <schema_id:delimiteur()>.<contrainte_id>Min(_<domaine_cle.id> <schema_id:delimiteur()>.<domaine_cle.type:delimiteur()>)
+  RETURNS BIT AS
+BEGIN
+  IF
+  (
+    (
+      SELECT COUNT(*)
+      FROM <schema_id:delimiteur()>.<table_id:delimiteur()>
+      WHERE <domaine_cle.id:delimiteur()> = _<domaine_cle.id>
+    ) >= <min>
+  )
+    RETURN 1;
+  ELSE
+    PRINT N'Participation  %  does not respect minimum value %', '<table_id>', <min>;
+    RETURN 0;
+END;
+GO<\n>
+>>
+/*************************************************************
+Création de fonction de verification participation Max
+**************************************************************/
+verificationParticipationMax(contrainte_id, schema_id, table_id, domaine_cle, max)::=
+<<
+-- Maximum participqtion ckeck on : <table_id>
+CREATE OR ALTER FUNCTION <schema_id:delimiteur()>.<contrainte_id>Max(_<domaine_cle.id> <schema_id:delimiteur()>.<domaine_cle.type:delimiteur()>)
+  RETURNS BIT AS
+BEGIN
+  IF
+  (
+    (
+      SELECT COUNT(*)
+      FROM <schema_id:delimiteur()>.<table_id:delimiteur()>
+      WHERE <domaine_cle.id:delimiteur()> = _<domaine_cle.id>
+    ) \<= <max>
+  )
+    RETURN 1;
+  ELSE
+    PRINT N'Participation  %  does not respect maximal value %', '<table_id>', <max>;
+    RETURN 0;
+END;
+GO<\n>
+>>
+
+/*************************************************************
+Création de fonction de verification d'appartenance d'un tuple à une classe
+**************************************************************/
+checkMembership(contrainte_id, schema_id, sourceTable_id, sourceAtt, targetTableMap)::=
+<<
+-- Membership ckeck on : <sourceTable_id>
+CREATE OR ALTER FUNCTION <schema_id:delimiteur()>.<contrainte_id>()
+  RETURNS <schema_id:delimiteur()>.<sourceTable_id:delimiteur()> AS
+SELECT *
+FROM <schema_id:delimiteur()>.<sourceTable_id:delimiteur()>
+WHERE <targetTableMap:{a| NOT EXISTS (SELECT <a.targetAtt:delimiteur()> FROM <schema_id:delimiteur()>.<a.table_id:delimiteur()> WHERE <sourceAtt:delimiteur()> = <a.targetAtt:delimiteur()>)}; separator="\n  AND ">
+;
+GO<\n>
+>>
+
+
+/**************************************************************
+ Divers gabarit réutilisable
+***************************************************************/
+
+ensAtt(att)::= <% (<att:{a|<a.id:delimiteur()>}; separator=", ">) %>
+
+paramAtt(att)::= <% (<att:{a|<a.entier>}; separator=", ">) %>
+
+delimiteur(id) ::= <% [<id>]%>
+
+selectKeys(schema_id, table_id, keySet) ::=
+<%
+  SELECT <keySet:{a|<a.id:delimiteur()>}; separator=", "> <\n>
+  FROM <schema_id:delimiteur()>.<table_id:delimiteur()>
+%>
+
+

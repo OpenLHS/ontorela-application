@@ -1,0 +1,29 @@
+datatypes:
+  # Numbers
+  "real": REAL
+  "double": BIGINT
+  "float": FLOAT
+  "rational": REAL
+  "decimal": DECIMAL
+  "integer": INT
+  "nonNegativeInteger": INT
+  "nonPositiveInteger": INT
+  "positiveInteger": INT
+  "negativeInteger": INT
+  "long": BIGINT
+  "int": INT
+  "short": SMALLINT
+  "byte": TINYINT
+  "unsignedLong": BIGINT
+  "unsignedInt": INT
+  "unsignedShort": SMALLINT
+  "unsignedByte": TINYINT
+  # Text
+  "string": VARCHAR
+  "Literal": TEXT
+  # Bool
+  "boolean": BIT
+  # Date and time
+  "date": DATE
+  "dateTime": DATETIME
+  "dateTimeStamp": DATETIME

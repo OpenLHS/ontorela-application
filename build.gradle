@@ -1,0 +1,36 @@
+// Generated 2025-05-13T16:45:34.399909977
+plugins {
+  id 'maven-publish'
+  id 'org.springframework.boot' version '3.3.4'
+  id 'java'
+}
+
+repositories {
+  mavenLocal()
+  mavenCentral()
+}
+
+group = "ca.griis"
+version = "2.1.0-SNAPSHOT"
+
+dependencies {
+    implementation files('lib/ca.griis.monto-library-1.4.1-SNAPSHOT.jar')
+    implementation "ch.qos.logback:logback-classic:1.5.18"
+    implementation "org.postgresql:postgresql:42.7.5"
+    testImplementation "org.junit.jupiter:junit-jupiter-engine:5.10.3"
+    testImplementation "org.junit.jupiter:junit-jupiter-params:5.10.3"
+    testImplementation "org.assertj:assertj-core:3.25.3"
+    testImplementation "org.mockito:mockito-junit-jupiter:5.11.0"
+    testImplementation "org.testcontainers:postgresql:1.21.0"
+
+}
+
+
+
+publishing {
+  publications {
+      mavenJava(MavenPublication) {
+          from components.java
+      }
+  }
+}
